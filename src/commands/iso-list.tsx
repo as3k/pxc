@@ -49,6 +49,7 @@ export function IsoListCommand() {
 		);
 	}
 
+	const indexWidth = 4;
 	const nameWidth = Math.max(30, ...isos.map((iso) => iso.filename.length)) + 2;
 	const storageWidth = Math.max(10, ...isos.map((iso) => iso.storage.length)) + 2;
 
@@ -60,13 +61,15 @@ export function IsoListCommand() {
 			</Box>
 
 			<Text bold dimColor>
+				{'#'.padEnd(indexWidth)}
 				{'NAME'.padEnd(nameWidth)}
 				{'STORAGE'.padEnd(storageWidth)}
 				{'SIZE'}
 			</Text>
 
-			{isos.map((iso) => (
+			{isos.map((iso, index) => (
 				<Box key={iso.volid}>
+					<Text color="cyan">{String(index + 1).padEnd(indexWidth)}</Text>
 					<Text bold>{iso.filename.padEnd(nameWidth)}</Text>
 					<Text dimColor>{iso.storage.padEnd(storageWidth)}</Text>
 					<Text>{formatBytes(iso.size)}</Text>
@@ -75,7 +78,7 @@ export function IsoListCommand() {
 
 			<Box marginTop={1}>
 				<Text dimColor>
-					{isos.length} ISO{isos.length !== 1 ? 's' : ''}
+					{isos.length} ISO{isos.length !== 1 ? 's' : ''} • delete by # or name
 				</Text>
 			</Box>
 		</Box>

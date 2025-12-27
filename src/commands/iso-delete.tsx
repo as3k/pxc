@@ -16,9 +16,20 @@ export function IsoDeleteCommand({ name }: IsoDeleteCommandProps) {
 		async function del() {
 			try {
 				const isos = await listAllIsos();
-				const iso = isos.find(
-					(i) => i.filename === name || i.volid === name || i.filename.toLowerCase() === name.toLowerCase()
-				);
+				// Sort alphabetically to match the list command order
+				const sortedIsos = isos.sort((a, b) => a.filename.localeCompare(b.filename));
+
+				let iso;
+				const index = parseInt(name, 10);
+				if (!isNaN(index) && index > 0 && index <= sortedIsos.length) {
+					// Lookup by index (1-based)
+					iso = sortedIsos[index - 1];
+				} else {
+					// Lookup by name or volid
+					iso = sortedIsos.find(
+						(i) => i.filename === name || i.volid === name || i.filename.toLowerCase() === name.toLowerCase()
+					);
+				}
 
 				if (!iso) {
 					setStatus('not-found');
