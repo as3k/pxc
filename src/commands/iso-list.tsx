@@ -1,14 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { listAllIsos } from '../lib/proxmox.js';
+import { Loading, formatBytes } from '../lib/ui.js';
 import type { IsoFile } from '../lib/types.js';
-
-function formatBytes(bytes: number): string {
-	if (bytes === 0 || isNaN(bytes)) return '-';
-	const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-	const i = Math.floor(Math.log(bytes) / Math.log(1024));
-	return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
-}
 
 export function IsoListCommand() {
 	const [isos, setIsos] = useState<IsoFile[]>([]);
@@ -28,24 +22,44 @@ export function IsoListCommand() {
 	}, []);
 
 	if (loading) {
-		return <Text>Loading ISOs...</Text>;
+		return (
+			<Box paddingY={1}>
+				<Loading>Loading ISOs...</Loading>
+			</Box>
+		);
 	}
 
 	if (error) {
-		return <Text color="red">Error: {error}</Text>;
+		return (
+			<Box paddingY={1}>
+				<Text color="red">✗ Error: {error}</Text>
+			</Box>
+		);
 	}
 
 	if (isos.length === 0) {
-		return <Text dimColor>No ISOs found</Text>;
+		return (
+			<Box flexDirection="column" paddingY={1}>
+				<Box marginBottom={1}>
+					<Text bold color="magenta">▲ pxc </Text>
+					<Text bold>iso list</Text>
+				</Box>
+				<Text dimColor>No ISOs found</Text>
+			</Box>
+		);
 	}
 
 	const nameWidth = Math.max(30, ...isos.map((iso) => iso.filename.length)) + 2;
 	const storageWidth = Math.max(10, ...isos.map((iso) => iso.storage.length)) + 2;
-	const sizeWidth = 12;
 
 	return (
 		<Box flexDirection="column" paddingY={1}>
-			<Text bold color="cyan">
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>iso list</Text>
+			</Box>
+
+			<Text bold dimColor>
 				{'NAME'.padEnd(nameWidth)}
 				{'STORAGE'.padEnd(storageWidth)}
 				{'SIZE'}
@@ -53,7 +67,7 @@ export function IsoListCommand() {
 
 			{isos.map((iso) => (
 				<Box key={iso.volid}>
-					<Text>{iso.filename.padEnd(nameWidth)}</Text>
+					<Text bold>{iso.filename.padEnd(nameWidth)}</Text>
 					<Text dimColor>{iso.storage.padEnd(storageWidth)}</Text>
 					<Text>{formatBytes(iso.size)}</Text>
 				</Box>

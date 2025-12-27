@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { deleteIso, listAllIsos } from '../lib/proxmox.js';
+import { Loading, Success, ErrorMessage } from '../lib/ui.js';
 
 interface IsoDeleteCommandProps {
 	name: string;
@@ -14,7 +15,6 @@ export function IsoDeleteCommand({ name }: IsoDeleteCommandProps) {
 	useEffect(() => {
 		async function del() {
 			try {
-				// Find the ISO by name or volid
 				const isos = await listAllIsos();
 				const iso = isos.find(
 					(i) => i.filename === name || i.volid === name || i.filename.toLowerCase() === name.toLowerCase()
@@ -38,41 +38,22 @@ export function IsoDeleteCommand({ name }: IsoDeleteCommandProps) {
 		del();
 	}, [name]);
 
-	if (status === 'finding') {
-		return (
-			<Box paddingY={1}>
-				<Text>Finding ISO...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'not-found') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">ISO not found: {name}</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'deleting') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">Deleting {volid}...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'error') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">Failed to delete ISO: {error}</Text>
-			</Box>
-		);
-	}
-
 	return (
-		<Box paddingY={1}>
-			<Text color="green">ISO deleted: {volid}</Text>
+		<Box flexDirection="column" paddingY={1}>
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>iso delete {name}</Text>
+			</Box>
+
+			{status === 'finding' && <Loading>Finding ISO...</Loading>}
+
+			{status === 'not-found' && <ErrorMessage>ISO not found: {name}</ErrorMessage>}
+
+			{status === 'deleting' && <Loading>Deleting {volid}...</Loading>}
+
+			{status === 'error' && <ErrorMessage>Failed to delete: {error}</ErrorMessage>}
+
+			{status === 'success' && <Success>Deleted {volid}</Success>}
 		</Box>
 	);
 }

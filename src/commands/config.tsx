@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, Box } from 'ink';
 import { loadConfig, getConfigPath } from '../lib/config.js';
+import { Info } from '../lib/ui.js';
 
 export function ConfigShowCommand() {
 	const config = loadConfig();
@@ -11,7 +12,11 @@ export function ConfigShowCommand() {
 
 	return (
 		<Box flexDirection="column" paddingY={1}>
-			<Text bold color="cyan">Configuration</Text>
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>config</Text>
+			</Box>
+
 			<Text dimColor>{configPath}</Text>
 			<Text> </Text>
 
@@ -21,38 +26,42 @@ export function ConfigShowCommand() {
 				<>
 					{hasDefaults && (
 						<>
-							<Text bold>defaults:</Text>
+							<Text bold color="cyan">defaults:</Text>
 							{config.defaults?.isoStorage && (
-								<Text>  isoStorage: {config.defaults.isoStorage}</Text>
+								<Text>  <Text dimColor>isoStorage:</Text> {config.defaults.isoStorage}</Text>
 							)}
 							{config.defaults?.vmStorage && (
-								<Text>  vmStorage: {config.defaults.vmStorage}</Text>
+								<Text>  <Text dimColor>vmStorage:</Text> {config.defaults.vmStorage}</Text>
 							)}
 							{config.defaults?.bridge && (
-								<Text>  bridge: {config.defaults.bridge}</Text>
+								<Text>  <Text dimColor>bridge:</Text> {config.defaults.bridge}</Text>
 							)}
 							{config.defaults?.cores && (
-								<Text>  cores: {config.defaults.cores}</Text>
+								<Text>  <Text dimColor>cores:</Text> {config.defaults.cores}</Text>
 							)}
 							{config.defaults?.memory && (
-								<Text>  memory: {config.defaults.memory}</Text>
+								<Text>  <Text dimColor>memory:</Text> {config.defaults.memory}</Text>
 							)}
 							{config.defaults?.disk && (
-								<Text>  disk: {config.defaults.disk}</Text>
+								<Text>  <Text dimColor>disk:</Text> {config.defaults.disk}</Text>
 							)}
 						</>
 					)}
 
 					{hasUi && (
 						<>
-							<Text bold>ui:</Text>
+							<Text bold color="cyan">ui:</Text>
 							{config.ui?.savePreferences !== undefined && (
-								<Text>  savePreferences: {String(config.ui.savePreferences)}</Text>
+								<Text>  <Text dimColor>savePreferences:</Text> {String(config.ui.savePreferences)}</Text>
 							)}
 						</>
 					)}
 				</>
 			)}
+
+			<Box marginTop={1}>
+				<Info>Edit {configPath} to change settings</Info>
+			</Box>
 		</Box>
 	);
 }

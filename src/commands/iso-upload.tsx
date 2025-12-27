@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { uploadIso, getIsoStorages } from '../lib/proxmox.js';
 import { getDefault, setDefault, shouldSavePreferences } from '../lib/config.js';
+import { Loading, Success, ErrorMessage, Info } from '../lib/ui.js';
 
 interface IsoUploadCommandProps {
 	file: string;
@@ -20,7 +21,6 @@ export function IsoUploadCommand({ file, storage }: IsoUploadCommandProps) {
 			try {
 				let storageToUse = storage;
 
-				// If no storage specified, check config then find first available
 				if (!storageToUse) {
 					storageToUse = getDefault('isoStorage');
 
@@ -31,7 +31,6 @@ export function IsoUploadCommand({ file, storage }: IsoUploadCommandProps) {
 						}
 						storageToUse = storages[0].name;
 
-						// Save this as the default for future use
 						if (shouldSavePreferences()) {
 							setDefault('isoStorage', storageToUse);
 							setSavedPreference(true);
@@ -55,35 +54,28 @@ export function IsoUploadCommand({ file, storage }: IsoUploadCommandProps) {
 
 	const displayFilename = file.split('/').pop() || file;
 
-	if (status === 'checking') {
-		return (
-			<Box paddingY={1}>
-				<Text>Checking storage...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'uploading') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">Uploading {displayFilename} to {targetStorage}...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'error') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">Failed to upload ISO: {error}</Text>
-			</Box>
-		);
-	}
-
 	return (
 		<Box flexDirection="column" paddingY={1}>
-			<Text color="green">ISO uploaded successfully</Text>
-			<Text dimColor>Volume ID: {volid}</Text>
-			{savedPreference && <Text dimColor>Saved {targetStorage} as default ISO storage</Text>}
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>iso upload</Text>
+			</Box>
+
+			{status === 'checking' && <Loading>Checking storage...</Loading>}
+
+			{status === 'uploading' && (
+				<Loading>Uploading {displayFilename} to {targetStorage}...</Loading>
+			)}
+
+			{status === 'error' && <ErrorMessage>Failed to upload: {error}</ErrorMessage>}
+
+			{status === 'success' && (
+				<>
+					<Success>Uploaded {displayFilename}</Success>
+					<Text dimColor>  Volume ID: {volid}</Text>
+					{savedPreference && <Info>Saved {targetStorage} as default storage</Info>}
+				</>
+			)}
 		</Box>
 	);
 }

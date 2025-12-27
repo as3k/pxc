@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { startVm, getVmStatus } from '../lib/proxmox.js';
+import { Loading, Success, ErrorMessage, Warning } from '../lib/ui.js';
 
 interface StartCommandProps {
 	vmid: number;
@@ -14,7 +15,6 @@ export function StartCommand({ vmid }: StartCommandProps) {
 	useEffect(() => {
 		async function start() {
 			try {
-				// Check current status first
 				const info = await getVmStatus(vmid);
 				if (!info) {
 					setStatus('not-found');
@@ -41,49 +41,24 @@ export function StartCommand({ vmid }: StartCommandProps) {
 
 	const typeLabel = vmType === 'lxc' ? 'Container' : 'VM';
 
-	if (status === 'checking') {
-		return (
-			<Box paddingY={1}>
-				<Text>Checking {vmid}...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'not-found') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">VM/Container {vmid} not found</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'starting') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">Starting {typeLabel} {vmid}...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'already-running') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">{typeLabel} {vmid} is already running</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'error') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">Failed to start {typeLabel} {vmid}: {error}</Text>
-			</Box>
-		);
-	}
-
 	return (
-		<Box paddingY={1}>
-			<Text color="green">{typeLabel} {vmid} started successfully</Text>
+		<Box flexDirection="column" paddingY={1}>
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>start {vmid}</Text>
+			</Box>
+
+			{status === 'checking' && <Loading>Checking {vmid}...</Loading>}
+
+			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found</ErrorMessage>}
+
+			{status === 'starting' && <Loading>Starting {typeLabel} {vmid}...</Loading>}
+
+			{status === 'already-running' && <Warning>{typeLabel} {vmid} is already running</Warning>}
+
+			{status === 'error' && <ErrorMessage>Failed to start {typeLabel} {vmid}: {error}</ErrorMessage>}
+
+			{status === 'success' && <Success>{typeLabel} {vmid} started</Success>}
 		</Box>
 	);
 }

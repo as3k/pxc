@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
 import { stopVm, getVmStatus } from '../lib/proxmox.js';
+import { Loading, Success, ErrorMessage, Warning } from '../lib/ui.js';
 
 interface StopCommandProps {
 	vmid: number;
@@ -15,7 +16,6 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 	useEffect(() => {
 		async function stop() {
 			try {
-				// Check current status first
 				const info = await getVmStatus(vmid);
 				if (!info) {
 					setStatus('not-found');
@@ -42,53 +42,28 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 
 	const typeLabel = vmType === 'lxc' ? 'Container' : 'VM';
 
-	if (status === 'checking') {
-		return (
-			<Box paddingY={1}>
-				<Text>Checking {vmid}...</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'not-found') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">VM/Container {vmid} not found</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'stopping') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">
-					{force ? 'Force stopping' : 'Stopping'} {typeLabel} {vmid}...
-				</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'already-stopped') {
-		return (
-			<Box paddingY={1}>
-				<Text color="yellow">{typeLabel} {vmid} is already stopped</Text>
-			</Box>
-		);
-	}
-
-	if (status === 'error') {
-		return (
-			<Box paddingY={1}>
-				<Text color="red">Failed to stop {typeLabel} {vmid}: {error}</Text>
-			</Box>
-		);
-	}
-
 	return (
-		<Box paddingY={1}>
-			<Text color="green">
-				{typeLabel} {vmid} stopped successfully{force ? ' (forced)' : ''}
-			</Text>
+		<Box flexDirection="column" paddingY={1}>
+			<Box marginBottom={1}>
+				<Text bold color="magenta">▲ pxc </Text>
+				<Text bold>stop {vmid}{force ? ' --force' : ''}</Text>
+			</Box>
+
+			{status === 'checking' && <Loading>Checking {vmid}...</Loading>}
+
+			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found</ErrorMessage>}
+
+			{status === 'stopping' && (
+				<Loading>{force ? 'Force stopping' : 'Stopping'} {typeLabel} {vmid}...</Loading>
+			)}
+
+			{status === 'already-stopped' && <Warning>{typeLabel} {vmid} is already stopped</Warning>}
+
+			{status === 'error' && <ErrorMessage>Failed to stop {typeLabel} {vmid}: {error}</ErrorMessage>}
+
+			{status === 'success' && (
+				<Success>{typeLabel} {vmid} stopped{force ? ' (forced)' : ''}</Success>
+			)}
 		</Box>
 	);
 }
