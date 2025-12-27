@@ -5,7 +5,8 @@ A modern, interactive CLI for managing Proxmox VMs with a Vercel-like experience
 ## Features
 
 - Interactive step-by-step VM creation wizard
-- List, start, and stop VMs
+- List, start, and stop VMs and containers across the cluster
+- Shows which node each VM/container is running on
 - Arrow-key navigation
 - Auto-detection of storage, bridges, and ISOs
 - Ceph-safe disk creation

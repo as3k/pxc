@@ -8,15 +8,23 @@ interface StopCommandProps {
 }
 
 export function StopCommand({ vmid, force }: StopCommandProps) {
-	const [status, setStatus] = useState<'checking' | 'stopping' | 'success' | 'error' | 'already-stopped'>('checking');
+	const [status, setStatus] = useState<'checking' | 'stopping' | 'success' | 'error' | 'already-stopped' | 'not-found'>('checking');
 	const [error, setError] = useState<string>('');
+	const [vmType, setVmType] = useState<'qemu' | 'lxc'>('qemu');
 
 	useEffect(() => {
 		async function stop() {
 			try {
 				// Check current status first
-				const currentStatus = await getVmStatus(vmid);
-				if (currentStatus === 'stopped') {
+				const info = await getVmStatus(vmid);
+				if (!info) {
+					setStatus('not-found');
+					return;
+				}
+
+				setVmType(info.type);
+
+				if (info.status === 'stopped') {
 					setStatus('already-stopped');
 					return;
 				}
@@ -32,10 +40,20 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 		stop();
 	}, [vmid, force]);
 
+	const typeLabel = vmType === 'lxc' ? 'Container' : 'VM';
+
 	if (status === 'checking') {
 		return (
 			<Box paddingY={1}>
-				<Text>Checking VM {vmid}...</Text>
+				<Text>Checking {vmid}...</Text>
+			</Box>
+		);
+	}
+
+	if (status === 'not-found') {
+		return (
+			<Box paddingY={1}>
+				<Text color="red">VM/Container {vmid} not found</Text>
 			</Box>
 		);
 	}
@@ -44,7 +62,7 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 		return (
 			<Box paddingY={1}>
 				<Text color="yellow">
-					{force ? 'Force stopping' : 'Stopping'} VM {vmid}...
+					{force ? 'Force stopping' : 'Stopping'} {typeLabel} {vmid}...
 				</Text>
 			</Box>
 		);
@@ -53,7 +71,7 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 	if (status === 'already-stopped') {
 		return (
 			<Box paddingY={1}>
-				<Text color="yellow">VM {vmid} is already stopped</Text>
+				<Text color="yellow">{typeLabel} {vmid} is already stopped</Text>
 			</Box>
 		);
 	}
@@ -61,7 +79,7 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 	if (status === 'error') {
 		return (
 			<Box paddingY={1}>
-				<Text color="red">Failed to stop VM {vmid}: {error}</Text>
+				<Text color="red">Failed to stop {typeLabel} {vmid}: {error}</Text>
 			</Box>
 		);
 	}
@@ -69,7 +87,7 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 	return (
 		<Box paddingY={1}>
 			<Text color="green">
-				VM {vmid} stopped successfully{force ? ' (forced)' : ''}
+				{typeLabel} {vmid} stopped successfully{force ? ' (forced)' : ''}
 			</Text>
 		</Box>
 	);

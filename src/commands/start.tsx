@@ -7,15 +7,23 @@ interface StartCommandProps {
 }
 
 export function StartCommand({ vmid }: StartCommandProps) {
-	const [status, setStatus] = useState<'checking' | 'starting' | 'success' | 'error' | 'already-running'>('checking');
+	const [status, setStatus] = useState<'checking' | 'starting' | 'success' | 'error' | 'already-running' | 'not-found'>('checking');
 	const [error, setError] = useState<string>('');
+	const [vmType, setVmType] = useState<'qemu' | 'lxc'>('qemu');
 
 	useEffect(() => {
 		async function start() {
 			try {
 				// Check current status first
-				const currentStatus = await getVmStatus(vmid);
-				if (currentStatus === 'running') {
+				const info = await getVmStatus(vmid);
+				if (!info) {
+					setStatus('not-found');
+					return;
+				}
+
+				setVmType(info.type);
+
+				if (info.status === 'running') {
 					setStatus('already-running');
 					return;
 				}
@@ -31,10 +39,20 @@ export function StartCommand({ vmid }: StartCommandProps) {
 		start();
 	}, [vmid]);
 
+	const typeLabel = vmType === 'lxc' ? 'Container' : 'VM';
+
 	if (status === 'checking') {
 		return (
 			<Box paddingY={1}>
-				<Text>Checking VM {vmid}...</Text>
+				<Text>Checking {vmid}...</Text>
+			</Box>
+		);
+	}
+
+	if (status === 'not-found') {
+		return (
+			<Box paddingY={1}>
+				<Text color="red">VM/Container {vmid} not found</Text>
 			</Box>
 		);
 	}
@@ -42,7 +60,7 @@ export function StartCommand({ vmid }: StartCommandProps) {
 	if (status === 'starting') {
 		return (
 			<Box paddingY={1}>
-				<Text color="yellow">Starting VM {vmid}...</Text>
+				<Text color="yellow">Starting {typeLabel} {vmid}...</Text>
 			</Box>
 		);
 	}
@@ -50,7 +68,7 @@ export function StartCommand({ vmid }: StartCommandProps) {
 	if (status === 'already-running') {
 		return (
 			<Box paddingY={1}>
-				<Text color="yellow">VM {vmid} is already running</Text>
+				<Text color="yellow">{typeLabel} {vmid} is already running</Text>
 			</Box>
 		);
 	}
@@ -58,14 +76,14 @@ export function StartCommand({ vmid }: StartCommandProps) {
 	if (status === 'error') {
 		return (
 			<Box paddingY={1}>
-				<Text color="red">Failed to start VM {vmid}: {error}</Text>
+				<Text color="red">Failed to start {typeLabel} {vmid}: {error}</Text>
 			</Box>
 		);
 	}
 
 	return (
 		<Box paddingY={1}>
-			<Text color="green">VM {vmid} started successfully</Text>
+			<Text color="green">{typeLabel} {vmid} started successfully</Text>
 		</Box>
 	);
 }

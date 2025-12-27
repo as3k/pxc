@@ -255,29 +255,31 @@ export async function getNodeName(): Promise<string> {
 }
 
 /**
- * List all VMs on the node
+ * List all VMs and containers across the cluster
  */
 export async function listVms(): Promise<VmInfo[]> {
 	if (MOCK_MODE) {
 		return [
-			{ vmid: 100, name: 'web-server', status: 'running', mem: 2147483648, maxmem: 4294967296, cpus: 2, uptime: 86400 },
-			{ vmid: 101, name: 'db-server', status: 'running', mem: 4294967296, maxmem: 8589934592, cpus: 4, uptime: 172800 },
-			{ vmid: 102, name: 'dev-box', status: 'stopped', mem: 0, maxmem: 2147483648, cpus: 2, uptime: 0 },
+			{ vmid: 100, name: 'web-server', type: 'qemu', node: 'node1', status: 'running', mem: 2147483648, maxmem: 4294967296, cpus: 2, uptime: 86400 },
+			{ vmid: 101, name: 'db-server', type: 'qemu', node: 'node2', status: 'running', mem: 4294967296, maxmem: 8589934592, cpus: 4, uptime: 172800 },
+			{ vmid: 102, name: 'container-1', type: 'lxc', node: 'node1', status: 'running', mem: 1073741824, maxmem: 2147483648, cpus: 2, uptime: 259200 },
+			{ vmid: 103, name: 'dev-box', type: 'qemu', node: 'node3', status: 'stopped', mem: 0, maxmem: 2147483648, cpus: 2, uptime: 0 },
 		];
 	}
 
 	try {
-		const node = await getNodeName();
-		const { stdout } = await execa('pvesh', ['get', `/nodes/${node}/qemu`, '--output-format', 'json']);
+		const { stdout } = await execa('pvesh', ['get', '/cluster/resources', '--type', 'vm', '--output-format', 'json']);
 		const data = JSON.parse(stdout);
 
 		return data.map((vm: any) => ({
 			vmid: vm.vmid,
 			name: vm.name || `VM ${vm.vmid}`,
+			type: vm.type as 'qemu' | 'lxc',
+			node: vm.node,
 			status: vm.status as 'running' | 'stopped' | 'paused',
 			mem: vm.mem || 0,
 			maxmem: vm.maxmem || 0,
-			cpus: vm.cpus || 0,
+			cpus: vm.maxcpu || 0,
 			uptime: vm.uptime || 0,
 		}));
 	} catch (error: any) {
@@ -286,7 +288,43 @@ export async function listVms(): Promise<VmInfo[]> {
 }
 
 /**
- * Start a VM
+ * Get VM/container info by ID
+ */
+export async function getVmInfo(vmid: number): Promise<VmInfo | null> {
+	if (MOCK_MODE) {
+		const mockVms = [
+			{ vmid: 100, name: 'web-server', type: 'qemu' as const, node: 'node1', status: 'running' as const, mem: 2147483648, maxmem: 4294967296, cpus: 2, uptime: 86400 },
+			{ vmid: 101, name: 'db-server', type: 'qemu' as const, node: 'node2', status: 'running' as const, mem: 4294967296, maxmem: 8589934592, cpus: 4, uptime: 172800 },
+			{ vmid: 102, name: 'container-1', type: 'lxc' as const, node: 'node1', status: 'running' as const, mem: 1073741824, maxmem: 2147483648, cpus: 2, uptime: 259200 },
+			{ vmid: 103, name: 'dev-box', type: 'qemu' as const, node: 'node3', status: 'stopped' as const, mem: 0, maxmem: 2147483648, cpus: 2, uptime: 0 },
+		];
+		return mockVms.find((vm) => vm.vmid === vmid) || null;
+	}
+
+	try {
+		const { stdout } = await execa('pvesh', ['get', '/cluster/resources', '--type', 'vm', '--output-format', 'json']);
+		const data = JSON.parse(stdout);
+		const vm = data.find((v: any) => v.vmid === vmid);
+		if (!vm) return null;
+
+		return {
+			vmid: vm.vmid,
+			name: vm.name || `VM ${vm.vmid}`,
+			type: vm.type as 'qemu' | 'lxc',
+			node: vm.node,
+			status: vm.status as 'running' | 'stopped' | 'paused',
+			mem: vm.mem || 0,
+			maxmem: vm.maxmem || 0,
+			cpus: vm.maxcpu || 0,
+			uptime: vm.uptime || 0,
+		};
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Start a VM or container
  */
 export async function startVm(vmid: number): Promise<void> {
 	if (MOCK_MODE) {
@@ -294,15 +332,21 @@ export async function startVm(vmid: number): Promise<void> {
 		return;
 	}
 
+	const info = await getVmInfo(vmid);
+	if (!info) {
+		throw new Error(`VM/container ${vmid} not found`);
+	}
+
 	try {
-		await execa('qm', ['start', vmid.toString()]);
+		const cmd = info.type === 'lxc' ? 'pct' : 'qm';
+		await execa(cmd, ['start', vmid.toString()]);
 	} catch (error: any) {
-		throw new Error(`Failed to start VM ${vmid}: ${error.message}`);
+		throw new Error(`Failed to start ${info.type === 'lxc' ? 'container' : 'VM'} ${vmid}: ${error.message}`);
 	}
 }
 
 /**
- * Stop a VM
+ * Stop a VM or container
  */
 export async function stopVm(vmid: number, force: boolean = false): Promise<void> {
 	if (MOCK_MODE) {
@@ -310,31 +354,35 @@ export async function stopVm(vmid: number, force: boolean = false): Promise<void
 		return;
 	}
 
+	const info = await getVmInfo(vmid);
+	if (!info) {
+		throw new Error(`VM/container ${vmid} not found`);
+	}
+
 	try {
+		const cmd = info.type === 'lxc' ? 'pct' : 'qm';
 		const args = ['stop', vmid.toString()];
-		if (force) {
+		if (force && info.type === 'qemu') {
 			args.push('--skiplock');
 		}
-		await execa('qm', args);
+		await execa(cmd, args);
 	} catch (error: any) {
-		throw new Error(`Failed to stop VM ${vmid}: ${error.message}`);
+		throw new Error(`Failed to stop ${info.type === 'lxc' ? 'container' : 'VM'} ${vmid}: ${error.message}`);
 	}
 }
 
 /**
- * Get VM status
+ * Get VM/container status
  */
-export async function getVmStatus(vmid: number): Promise<string> {
+export async function getVmStatus(vmid: number): Promise<{ status: string; type: 'qemu' | 'lxc' } | null> {
 	if (MOCK_MODE) {
-		return vmid === 102 ? 'stopped' : 'running';
+		if (vmid === 103) return { status: 'stopped', type: 'qemu' };
+		if (vmid === 102) return { status: 'running', type: 'lxc' };
+		return { status: 'running', type: 'qemu' };
 	}
 
-	try {
-		const { stdout } = await execa('qm', ['status', vmid.toString()]);
-		// Output format: "status: running" or "status: stopped"
-		const match = stdout.match(/status:\s*(\w+)/);
-		return match ? match[1] : 'unknown';
-	} catch (error: any) {
-		throw new Error(`Failed to get status for VM ${vmid}: ${error.message}`);
-	}
+	const info = await getVmInfo(vmid);
+	if (!info) return null;
+
+	return { status: info.status, type: info.type };
 }

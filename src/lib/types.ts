@@ -74,11 +74,13 @@ export interface ExecutionResult {
 }
 
 /**
- * VM information from Proxmox
+ * VM/Container information from Proxmox cluster
  */
 export interface VmInfo {
 	vmid: number;
 	name: string;
+	type: 'qemu' | 'lxc';
+	node: string;
 	status: 'running' | 'stopped' | 'paused';
 	mem: number;
 	maxmem: number;
