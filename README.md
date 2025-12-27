@@ -4,13 +4,15 @@ A modern, interactive CLI for managing Proxmox VMs with a Vercel-like experience
 
 ## Features
 
-- Interactive step-by-step VM creation wizard
-- List, start, and stop VMs and containers across the cluster
-- Shows which node each VM/container is running on
+- Interactive step-by-step VM creation wizard (9 steps including node selection)
+- **NEW**: Full cluster compatibility with node selection
+- List, start, and stop VMs and containers across cluster
+- Shows cluster status and node grouping
 - Arrow-key navigation
-- Auto-detection of storage, bridges, and ISOs
+- Auto-detection of storage, bridges, and ISOs on target nodes
 - Ceph-safe disk creation
 - Clean, modern terminal UI
+- **NEW**: Per-node configuration preferences
 
 ## Requirements
 
@@ -28,21 +30,21 @@ npm install -g pxc
 
 ```bash
 pxc                     # Show help
-pxc create              # Create a new VM (interactive wizard)
-pxc list                # List all VMs and containers
+pxc create              # Create a new VM (interactive wizard with node selection)
+pxc list                # List all VMs and containers (cluster-aware)
 pxc ls                  # Alias for list
 pxc start <vmid>        # Start a VM or container
 pxc stop <vmid>         # Stop a VM or container (graceful)
 pxc stop <vmid> --force # Force stop a VM
 
-# ISO Management
+# ISO Management (node-aware)
 pxc iso list            # List all ISOs
-pxc iso download <url>  # Download ISO from URL
-pxc iso upload <file>   # Upload local ISO file
+pxc iso download <url>  # Download ISO to target node storage
+pxc iso upload <file>   # Upload local ISO to node storage
 pxc iso delete <name>   # Delete an ISO
 
-# Configuration
-pxc config show         # Show current config
+# Configuration (cluster-aware)
+pxc config show         # Show current config (includes per-node settings)
 pxc config path         # Show config file path
 ```
 
@@ -73,9 +75,27 @@ defaults:
   memory: 2048              # Default memory (MB)
   disk: 32                  # Default disk size (GB)
 
+nodes:                      # NEW: Per-node configuration
+  node1:
+    bridge: vmbr0           # Default bridge for this node
+    vmStorage: local-lvm     # Default VM storage for this node
+  node2:
+    bridge: vmbr1           # Different bridge for this node
+    vmStorage: ceph-pool    # Use shared storage
+
 ui:
   savePreferences: true     # Auto-save selections as defaults
 ```
+
+### NEW: Cluster Support
+
+PXC now supports Proxmox clusters with node selection:
+
+- **Single-node**: Works exactly as before
+- **Multi-node**: Choose target node for VM creation
+- **Per-node config**: Different defaults per node
+- **Cluster listing**: Shows VMs grouped by node
+- **Node status**: Online/offline indicators
 
 **Commands:**
 ```bash
