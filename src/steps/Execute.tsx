@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Text, Box } from 'ink';
 import { createVm } from '../lib/proxmox.js';
-import type { VmState } from '../lib/types.js';
+import type { VmState, VmConfig } from '../lib/types.js';
 
 interface ExecuteProps {
 	state: VmState;
@@ -13,13 +13,28 @@ export function Execute({ state, onSuccess, onError }: ExecuteProps) {
 	const [status, setStatus] = useState<string>('Creating VM...');
 
 	useEffect(() => {
-		createVm(state)
+		// Convert VmState to VmConfig (they're compatible now)
+		const vmConfig: VmConfig = {
+			vmid: state.vmid,
+			name: state.name,
+			cores: state.cores,
+			memoryMb: state.memoryMb,
+			diskGb: state.diskGb,
+			storage: state.storage,
+			bridge: state.bridge,
+			isoVolid: state.isoVolid,
+			node: state.node, // Optional node parameter
+		};
+
+		createVm(vmConfig)
 			.then(() => {
-				setStatus('VM created successfully');
+				const nodeInfo = vmConfig.node ? ` on ${vmConfig.node}` : '';
+				setStatus(`VM created successfully${nodeInfo}`);
 				setTimeout(onSuccess, 500);
 			})
 			.catch((err) => {
-				onError(err.message);
+				const nodeInfo = vmConfig.node ? ` on ${vmConfig.node}` : '';
+				onError(`VM creation failed${nodeInfo}: ${err.message}`);
 			});
 	}, [state, onSuccess, onError]);
 

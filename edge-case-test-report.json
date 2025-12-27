@@ -1,0 +1,198 @@
+{
+  "network": [
+    {
+      "name": "Bridge detection on node1",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:54.753Z"
+    },
+    {
+      "name": "Bridge detection on node2",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:54.964Z"
+    },
+    {
+      "name": "Bridge detection with invalid node",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:55.175Z"
+    },
+    {
+      "name": "Fallback to default bridge on failure",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:55.387Z"
+    }
+  ],
+  "storage": [
+    {
+      "name": "Storage detection on node1",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:55.604Z"
+    },
+    {
+      "name": "Storage detection on node2",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:55.822Z"
+    },
+    {
+      "name": "ISO storage detection",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:56.032Z"
+    },
+    {
+      "name": "ISO files from invalid storage",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:56.244Z"
+    }
+  ],
+  "nodeState": [
+    {
+      "name": "Get cluster nodes",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:56.452Z"
+    },
+    {
+      "name": "Get offline node status",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:56.658Z"
+    },
+    {
+      "name": "Get preferred node",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:56.862Z"
+    },
+    {
+      "name": "Cluster environment detection",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:57.065Z"
+    },
+    {
+      "name": "List VMs across cluster",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:57.270Z"
+    }
+  ],
+  "configuration": [
+    {
+      "name": "Load config when file missing",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:59.972Z"
+    },
+    {
+      "name": "Resolved defaults with no config",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:00.134Z"
+    },
+    {
+      "name": "Node config with no config file",
+      "passed": false,
+      "details": "Command failed: node --input-type=module -e \"import { getNodeConfig } from \\\"./dist/lib/config.js\\\"; const config = getNodeConfig(\\\"test-node\\\"); console.log(\\\"Node config:\", Object.keys(config))\"\n/bin/sh: 1: Syntax error: \"(\" unexpected\n",
+      "timestamp": "2025-12-27T11:18:00.136Z"
+    }
+  ],
+  "vmCreation": [
+    {
+      "name": "Get next VM ID",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:57.474Z"
+    },
+    {
+      "name": "Check VM ID availability",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:57.679Z"
+    },
+    {
+      "name": "VM creation with invalid node",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:58.389Z"
+    },
+    {
+      "name": "VM creation with extreme values",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:59.101Z"
+    },
+    {
+      "name": "VM creation on offline node",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:17:59.806Z"
+    }
+  ],
+  "mockMode": [
+    {
+      "name": "Mock mode enabled",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:00.342Z"
+    },
+    {
+      "name": "Mock mode disabled",
+      "passed": false,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:00.562Z"
+    },
+    {
+      "name": "Mock VM operations",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:01.271Z"
+    }
+  ],
+  "errorHandling": [
+    {
+      "name": "Invalid VM ID handling",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:01.481Z"
+    },
+    {
+      "name": "Non-existent VM status",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:01.685Z"
+    }
+  ],
+  "performance": [
+    {
+      "name": "Rapid successive operations",
+      "passed": true,
+      "details": "Took 1007ms for 5 operations",
+      "timestamp": "2025-12-27T11:18:02.693Z"
+    },
+    {
+      "name": "Memory usage check",
+      "passed": true,
+      "details": "",
+      "timestamp": "2025-12-27T11:18:02.821Z"
+    },
+    {
+      "name": "Stress test (20 operations)",
+      "passed": true,
+      "details": "Took 4109ms for 20 operations",
+      "timestamp": "2025-12-27T11:18:06.930Z"
+    }
+  ],
+  "summary": {
+    "total": 29,
+    "passed": 27,
+    "failed": 2,
+    "critical": 0
+  }
+}
