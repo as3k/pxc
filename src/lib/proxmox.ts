@@ -58,24 +58,19 @@ export async function getStorages(): Promise<ProxmoxStorage[]> {
 	}
 
 	try {
-		const { stdout } = await execa('pvesm', ['status']);
-		const lines = stdout.split('\n').slice(1); // Skip header
+		const { stdout } = await execa('pvesh', ['get', '/storage', '--output-format', 'json']);
+		const data = JSON.parse(stdout);
 
 		const storages: ProxmoxStorage[] = [];
 
-		for (const line of lines) {
-			if (!line.trim()) continue;
-
-			const parts = line.split(/\s+/);
-			const [name, type, status, , , content] = parts;
-
-			// Only include storages that can hold VM disks
-			if (status === 'active' && content?.includes('images')) {
+		for (const storage of data) {
+			// Only include storages that can hold VM disks (have 'images' in content)
+			if (storage.content?.includes('images')) {
 				storages.push({
-					name,
-					type,
+					name: storage.storage,
+					type: storage.type,
 					available: true,
-					content: content.split(','),
+					content: storage.content.split(','),
 				});
 			}
 		}
@@ -83,6 +78,41 @@ export async function getStorages(): Promise<ProxmoxStorage[]> {
 		return storages;
 	} catch (error) {
 		throw new Error('Failed to get storage list');
+	}
+}
+
+/**
+ * Get storages that can hold ISO files
+ */
+export async function getIsoStorages(): Promise<ProxmoxStorage[]> {
+	if (MOCK_MODE) {
+		return [
+			{ name: 'local', type: 'dir', available: true, content: ['iso', 'images'] },
+			{ name: 'nfs-iso', type: 'nfs', available: true, content: ['iso'] },
+		];
+	}
+
+	try {
+		const { stdout } = await execa('pvesh', ['get', '/storage', '--output-format', 'json']);
+		const data = JSON.parse(stdout);
+
+		const storages: ProxmoxStorage[] = [];
+
+		for (const storage of data) {
+			// Only include storages that can hold ISO files
+			if (storage.content?.includes('iso')) {
+				storages.push({
+					name: storage.storage,
+					type: storage.type,
+					available: true,
+					content: storage.content.split(','),
+				});
+			}
+		}
+
+		return storages;
+	} catch (error) {
+		throw new Error('Failed to get ISO storage list');
 	}
 }
 
