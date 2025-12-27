@@ -72,3 +72,16 @@ export interface ExecutionResult {
 	vmid?: number;
 	error?: string;
 }
+
+/**
+ * VM information from Proxmox
+ */
+export interface VmInfo {
+	vmid: number;
+	name: string;
+	status: 'running' | 'stopped' | 'paused';
+	mem: number;
+	maxmem: number;
+	cpus: number;
+	uptime: number;
+}

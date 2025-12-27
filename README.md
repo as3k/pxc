@@ -1,10 +1,11 @@
-# Proxmox VM Wizard
+# pxc - Proxmox VM CLI
 
-A modern, interactive CLI for creating Proxmox VMs with a Vercel-like experience.
+A modern, interactive CLI for managing Proxmox VMs with a Vercel-like experience.
 
 ## Features
 
-- Interactive step-by-step VM creation
+- Interactive step-by-step VM creation wizard
+- List, start, and stop VMs
 - Arrow-key navigation
 - Auto-detection of storage, bridges, and ISOs
 - Ceph-safe disk creation
@@ -19,15 +20,19 @@ A modern, interactive CLI for creating Proxmox VMs with a Vercel-like experience
 ## Installation
 
 ```bash
-npm install
+npm install -g pxc
 ```
 
 ## Usage
 
-**On a Proxmox VE node:**
-
 ```bash
-npm start
+pxc                     # Show help
+pxc create              # Create a new VM (interactive wizard)
+pxc list                # List all VMs
+pxc ls                  # Alias for list
+pxc start <vmid>        # Start a VM
+pxc stop <vmid>         # Stop a VM (graceful)
+pxc stop <vmid> --force # Force stop a VM
 ```
 
 **For testing/development (mock mode):**
@@ -79,9 +84,14 @@ Built with:
 
 ```
 src/
-├── index.tsx          # CLI entry point
-├── app.tsx            # Main app orchestration
-├── steps/             # Step components
+├── index.tsx          # CLI entry point with commander
+├── app.tsx            # Re-exports for compatibility
+├── commands/          # CLI subcommands
+│   ├── create.tsx     # VM creation wizard
+│   ├── list.tsx       # List VMs
+│   ├── start.tsx      # Start VM
+│   └── stop.tsx       # Stop VM
+├── steps/             # Wizard step components
 │   ├── Welcome.tsx
 │   ├── Identity.tsx
 │   ├── Compute.tsx

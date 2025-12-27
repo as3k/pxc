@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import type { ProxmoxStorage, ProxmoxBridge, IsoFile, VmState } from './types.js';
+import type { ProxmoxStorage, ProxmoxBridge, IsoFile, VmState, VmInfo } from './types.js';
 
 const MOCK_MODE = process.env.MOCK_PROXMOX === '1';
 
@@ -251,5 +251,90 @@ export async function getNodeName(): Promise<string> {
 		return stdout.trim();
 	} catch {
 		return 'localhost';
+	}
+}
+
+/**
+ * List all VMs on the node
+ */
+export async function listVms(): Promise<VmInfo[]> {
+	if (MOCK_MODE) {
+		return [
+			{ vmid: 100, name: 'web-server', status: 'running', mem: 2147483648, maxmem: 4294967296, cpus: 2, uptime: 86400 },
+			{ vmid: 101, name: 'db-server', status: 'running', mem: 4294967296, maxmem: 8589934592, cpus: 4, uptime: 172800 },
+			{ vmid: 102, name: 'dev-box', status: 'stopped', mem: 0, maxmem: 2147483648, cpus: 2, uptime: 0 },
+		];
+	}
+
+	try {
+		const node = await getNodeName();
+		const { stdout } = await execa('pvesh', ['get', `/nodes/${node}/qemu`, '--output-format', 'json']);
+		const data = JSON.parse(stdout);
+
+		return data.map((vm: any) => ({
+			vmid: vm.vmid,
+			name: vm.name || `VM ${vm.vmid}`,
+			status: vm.status as 'running' | 'stopped' | 'paused',
+			mem: vm.mem || 0,
+			maxmem: vm.maxmem || 0,
+			cpus: vm.cpus || 0,
+			uptime: vm.uptime || 0,
+		}));
+	} catch (error: any) {
+		throw new Error(`Failed to list VMs: ${error.message}`);
+	}
+}
+
+/**
+ * Start a VM
+ */
+export async function startVm(vmid: number): Promise<void> {
+	if (MOCK_MODE) {
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		return;
+	}
+
+	try {
+		await execa('qm', ['start', vmid.toString()]);
+	} catch (error: any) {
+		throw new Error(`Failed to start VM ${vmid}: ${error.message}`);
+	}
+}
+
+/**
+ * Stop a VM
+ */
+export async function stopVm(vmid: number, force: boolean = false): Promise<void> {
+	if (MOCK_MODE) {
+		await new Promise((resolve) => setTimeout(resolve, 500));
+		return;
+	}
+
+	try {
+		const args = ['stop', vmid.toString()];
+		if (force) {
+			args.push('--skiplock');
+		}
+		await execa('qm', args);
+	} catch (error: any) {
+		throw new Error(`Failed to stop VM ${vmid}: ${error.message}`);
+	}
+}
+
+/**
+ * Get VM status
+ */
+export async function getVmStatus(vmid: number): Promise<string> {
+	if (MOCK_MODE) {
+		return vmid === 102 ? 'stopped' : 'running';
+	}
+
+	try {
+		const { stdout } = await execa('qm', ['status', vmid.toString()]);
+		// Output format: "status: running" or "status: stopped"
+		const match = stdout.match(/status:\s*(\w+)/);
+		return match ? match[1] : 'unknown';
+	} catch (error: any) {
+		throw new Error(`Failed to get status for VM ${vmid}: ${error.message}`);
 	}
 }
