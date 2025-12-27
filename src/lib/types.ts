@@ -1,16 +1,7 @@
 /**
  * Core VM configuration state
  */
-export interface VmState {
-	vmid: number;
-	name: string;
-	cores: number;
-	memoryMb: number;
-	diskGb: number;
-	storage: string;
-	bridge: string;
-	isoVolid?: string;
-}
+export interface VmState extends VmConfig {}
 
 /**
  * Wizard step names
@@ -18,6 +9,7 @@ export interface VmState {
 export type WizardStep =
 	| 'welcome'
 	| 'identity'
+	| 'node-selection'
 	| 'compute'
 	| 'storage'
 	| 'network'
@@ -88,4 +80,31 @@ export interface VmInfo {
 	maxmem: number;
 	cpus: number;
 	uptime: number;
+}
+
+/**
+ * Proxmox cluster node information
+ */
+export interface ClusterNode {
+	name: string;
+	status: 'online' | 'offline';
+	ip?: string;
+	level?: string;
+	id?: string;
+	type?: string;
+}
+
+/**
+ * VM configuration for creation
+ */
+export interface VmConfig {
+	vmid: number;
+	name: string;
+	cores: number;
+	memoryMb: number;
+	diskGb: number;
+	storage: string;
+	bridge: string;
+	isoVolid?: string;
+	node?: string; // Optional target node
 }

@@ -37,6 +37,15 @@ export interface Config {
 		package?: string; // default package to use
 	};
 	packages?: Record<string, Package>;
+	nodes?: Record<string, {
+		isoStorage?: string;
+		vmStorage?: string;
+		bridge?: string;
+		cores?: number;
+		memory?: number;
+		disk?: number;
+		node?: string;
+	}>;
 	ui?: {
 		savePreferences?: boolean;
 	};
@@ -228,6 +237,92 @@ export function getResolvedDefaults(packageName?: string): Partial<Package> {
 		if (pkg.disk !== undefined) resolved.disk = pkg.disk;
 		if (pkg.bridge !== undefined) resolved.bridge = pkg.bridge;
 		if (pkg.node !== undefined) resolved.node = pkg.node;
+		if (pkg.isoStorage !== undefined) resolved.isoStorage = pkg.isoStorage;
+		if (pkg.vmStorage !== undefined) resolved.vmStorage = pkg.vmStorage;
+	}
+
+	return resolved;
+}
+
+/**
+ * Get node-specific configuration
+ */
+export function getNodeConfig(node: string): Partial<Package> {
+	const config = loadConfig();
+	const nodeConfig = config.nodes?.[node] || {};
+	
+	// Merge node config with global defaults
+	const globalDefaults = config.defaults || {};
+	
+	return {
+		cores: nodeConfig.cores ?? globalDefaults.cores,
+		memory: nodeConfig.memory ?? globalDefaults.memory,
+		disk: nodeConfig.disk ?? globalDefaults.disk,
+		bridge: nodeConfig.bridge ?? globalDefaults.bridge,
+		isoStorage: nodeConfig.isoStorage ?? globalDefaults.isoStorage,
+		vmStorage: nodeConfig.vmStorage ?? globalDefaults.vmStorage,
+	};
+}
+
+/**
+ * Save node-specific preference
+ */
+export function saveNodePreference(node: string, key: string, value: any): void {
+	const config = loadConfig();
+	if (!config.nodes) {
+		config.nodes = {};
+	}
+	if (!config.nodes[node]) {
+		config.nodes[node] = {};
+	}
+	
+	// Only allow valid package properties (except node which doesn't make sense for node-specific config)
+	const validKeys = ['cores', 'memory', 'disk', 'bridge', 'isoStorage', 'vmStorage'];
+	if (validKeys.includes(key)) {
+		(config.nodes[node] as any)[key] = value;
+		saveConfig(config);
+	} else {
+		throw new Error(`Invalid node preference key: ${key}. Valid keys: ${validKeys.join(', ')}`);
+	}
+}
+
+/**
+ * Get resolved defaults for a specific node (global defaults + node overrides + package)
+ */
+export function getNodeResolvedDefaults(node: string, packageName?: string): Partial<Package> {
+	const config = loadConfig();
+	const globalDefaults = config.defaults || {};
+	const nodeConfig = config.nodes?.[node] || {};
+
+	// Start with global defaults
+	const resolved: Partial<Package> = {
+		cores: globalDefaults.cores,
+		memory: globalDefaults.memory,
+		disk: globalDefaults.disk,
+		bridge: globalDefaults.bridge,
+		node: node,
+		isoStorage: globalDefaults.isoStorage,
+		vmStorage: globalDefaults.vmStorage,
+	};
+
+	// Apply node overrides
+	if (nodeConfig.cores !== undefined) resolved.cores = nodeConfig.cores;
+	if (nodeConfig.memory !== undefined) resolved.memory = nodeConfig.memory;
+	if (nodeConfig.disk !== undefined) resolved.disk = nodeConfig.disk;
+	if (nodeConfig.bridge !== undefined) resolved.bridge = nodeConfig.bridge;
+	if (nodeConfig.isoStorage !== undefined) resolved.isoStorage = nodeConfig.isoStorage;
+	if (nodeConfig.vmStorage !== undefined) resolved.vmStorage = nodeConfig.vmStorage;
+
+	// Determine which package to use
+	const pkgName = packageName || globalDefaults.package;
+	if (pkgName && config.packages?.[pkgName]) {
+		const pkg = config.packages[pkgName];
+		// Package values override both global and node defaults
+		if (pkg.cores !== undefined) resolved.cores = pkg.cores;
+		if (pkg.memory !== undefined) resolved.memory = pkg.memory;
+		if (pkg.disk !== undefined) resolved.disk = pkg.disk;
+		if (pkg.bridge !== undefined) resolved.bridge = pkg.bridge;
+		if (pkg.node !== undefined) resolved.node = pkg.node; // Package can override node
 		if (pkg.isoStorage !== undefined) resolved.isoStorage = pkg.isoStorage;
 		if (pkg.vmStorage !== undefined) resolved.vmStorage = pkg.vmStorage;
 	}

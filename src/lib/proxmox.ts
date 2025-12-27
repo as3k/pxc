@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import type { ProxmoxStorage, ProxmoxBridge, IsoFile, VmState, VmInfo } from './types.js';
+import type { ProxmoxStorage, ProxmoxBridge, IsoFile, VmInfo, ClusterNode, VmConfig } from './types.js';
 
 const MOCK_MODE = process.env.MOCK_PROXMOX === '1';
 
@@ -48,8 +48,16 @@ export async function isVmidAvailable(vmid: number): Promise<boolean> {
 /**
  * Get available storage pools that support VM disks
  */
-export async function getStorages(): Promise<ProxmoxStorage[]> {
+export async function getStorages(node?: string): Promise<ProxmoxStorage[]> {
 	if (MOCK_MODE) {
+		// Return different storages for different nodes to simulate cluster differences
+		if (node === 'node2') {
+			return [
+				{ name: 'local-lvm', type: 'lvmthin', available: true, content: ['images'] },
+				{ name: 'ceph-pool', type: 'rbd', available: true, content: ['images'] },
+				{ name: 'shared-storage', type: 'nfs', available: true, content: ['images', 'iso'] },
+			];
+		}
 		return [
 			{ name: 'local-lvm', type: 'lvmthin', available: true, content: ['images'] },
 			{ name: 'ceph-pool', type: 'rbd', available: true, content: ['images'] },
@@ -84,8 +92,15 @@ export async function getStorages(): Promise<ProxmoxStorage[]> {
 /**
  * Get storages that can hold ISO files
  */
-export async function getIsoStorages(): Promise<ProxmoxStorage[]> {
+export async function getIsoStorages(node?: string): Promise<ProxmoxStorage[]> {
 	if (MOCK_MODE) {
+		// Return different storages for different nodes to simulate cluster differences
+		if (node === 'node2') {
+			return [
+				{ name: 'local', type: 'dir', available: true, content: ['iso', 'images'] },
+				{ name: 'shared-iso', type: 'nfs', available: true, content: ['iso'] },
+			];
+		}
 		return [
 			{ name: 'local', type: 'dir', available: true, content: ['iso', 'images'] },
 			{ name: 'nfs-iso', type: 'nfs', available: true, content: ['iso'] },
@@ -119,8 +134,17 @@ export async function getIsoStorages(): Promise<ProxmoxStorage[]> {
 /**
  * Get available network bridges
  */
-export async function getBridges(node: string = 'localhost'): Promise<ProxmoxBridge[]> {
+export async function getBridges(node?: string): Promise<ProxmoxBridge[]> {
+	const targetNode = node || await getPreferredNode();
+	
 	if (MOCK_MODE) {
+		// Return different bridges for different nodes to simulate cluster differences
+		if (targetNode === 'node2') {
+			return [
+				{ name: 'vmbr0', active: true },
+				{ name: 'vmbr2', active: true },
+			];
+		}
 		return [
 			{ name: 'vmbr0', active: true },
 			{ name: 'vmbr1', active: true },
@@ -128,7 +152,7 @@ export async function getBridges(node: string = 'localhost'): Promise<ProxmoxBri
 	}
 
 	try {
-		const { stdout } = await execa('pvesh', ['get', `/nodes/${node}/network`, '--type', 'bridge']);
+		const { stdout } = await execa('pvesh', ['get', `/nodes/${targetNode}/network`, '--type', 'bridge']);
 		const data = JSON.parse(stdout);
 
 		return data.map((bridge: any) => ({
@@ -185,20 +209,21 @@ export async function getIsoFiles(storage: string = 'local'): Promise<IsoFile[]>
 /**
  * Create a VM
  */
-export async function createVm(state: VmState): Promise<void> {
-	const { vmid, name, cores, memoryMb, diskGb, storage, bridge, isoVolid } = state;
+export async function createVm(config: VmConfig): Promise<void> {
+	const { vmid, name, cores, memoryMb, diskGb, storage, bridge, isoVolid, node } = config;
+	const targetNode = node || await getPreferredNode();
 
-	if (MOCK_MODE) {
+	if (process.env.MOCK_PROXMOX === '1' || MOCK_MODE) {
 		// Simulate VM creation delay
-		await new Promise((resolve) => setTimeout(resolve, 1000));
+		await new Promise((resolve) => setTimeout(resolve, 500));
 		console.log(
-			`[MOCK] Would create VM ${vmid} (${name}): ${cores} cores, ${memoryMb}MB RAM, ${diskGb}GB disk on ${storage}, bridge ${bridge}${isoVolid ? `, ISO: ${isoVolid}` : ''}`
+			`[MOCK] Would create VM ${vmid} (${name}) on ${targetNode}: ${cores} cores, ${memoryMb}MB RAM, ${diskGb}GB disk on ${storage}, bridge ${bridge}${isoVolid ? `, ISO: ${isoVolid}` : ''}`
 		);
 		return;
 	}
 
 	try {
-		// Step 1: Create the VM
+		// Step 1: Create the VM on the specified node
 		await execa('qm', [
 			'create',
 			vmid.toString(),
@@ -243,6 +268,68 @@ export async function createVm(state: VmState): Promise<void> {
 }
 
 /**
+ * Get all cluster nodes
+ */
+export async function getClusterNodes(): Promise<ClusterNode[]> {
+	if (MOCK_MODE) {
+		return [
+			{ name: 'node1', status: 'online', ip: '192.168.1.101', level: 'c', id: 'node1', type: 'node' },
+			{ name: 'node2', status: 'online', ip: '192.168.1.102', level: 'c', id: 'node2', type: 'node' },
+			{ name: 'node3', status: 'offline', ip: '192.168.1.103', level: '', id: 'node3', type: 'node' },
+		];
+	}
+
+	try {
+		const { stdout } = await execa('pvesh', ['get', '/nodes', '--output-format', 'json']);
+		const data = JSON.parse(stdout);
+
+		return data.map((node: any) => ({
+			name: node.node,
+			status: node.status === 'online' ? 'online' : 'offline',
+			ip: node.ip,
+			level: node.level,
+			id: node.id,
+			type: node.type,
+		}));
+	} catch (error: any) {
+		throw new Error(`Failed to get cluster nodes: ${error.message}`);
+	}
+}
+
+/**
+ * Check if we're in a cluster environment
+ */
+export async function isClusterEnvironment(): Promise<boolean> {
+	if (MOCK_MODE) return true;
+
+	try {
+		const nodes = await getClusterNodes();
+		return nodes.length > 1;
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Get node status
+ */
+export async function getNodeStatus(node: string): Promise<'online' | 'offline'> {
+	if (MOCK_MODE) {
+		// Mock some nodes as offline for testing
+		return node === 'node3' ? 'offline' : 'online';
+	}
+
+	try {
+		const { stdout } = await execa('pvesh', ['get', `/nodes/${node}/status`, '--output-format', 'json']);
+		const data = JSON.parse(stdout);
+		return data.status === 'online' ? 'online' : 'offline';
+	} catch (error: any) {
+		// If we can't get status, assume offline
+		return 'offline';
+	}
+}
+
+/**
  * Get current node name
  */
 export async function getNodeName(): Promise<string> {
@@ -254,6 +341,39 @@ export async function getNodeName(): Promise<string> {
 	} catch {
 		return 'localhost';
 	}
+}
+
+/**
+ * Get the preferred node for operations (current node if in cluster, otherwise current hostname)
+ */
+export async function getPreferredNode(): Promise<string> {
+	if (MOCK_MODE) return 'node1';
+
+	const currentNode = await getNodeName();
+	const isCluster = await isClusterEnvironment();
+	
+	if (isCluster) {
+		// In a cluster, check if current node is part of the cluster
+		const clusterNodes = await getClusterNodes();
+		const currentNodeInCluster = clusterNodes.find(n => n.name === currentNode);
+		
+		if (currentNodeInCluster && currentNodeInCluster.status === 'online') {
+			return currentNode;
+		}
+		
+		// Fall back to the first online node
+		const firstOnlineNode = clusterNodes.find(n => n.status === 'online');
+		if (firstOnlineNode) {
+			return firstOnlineNode.name;
+		}
+		
+		// Last resort: use the first node in the cluster
+		if (clusterNodes.length > 0) {
+			return clusterNodes[0].name;
+		}
+	}
+	
+	return currentNode;
 }
 
 /**
@@ -334,7 +454,8 @@ export async function downloadIso(
 	url: string,
 	storage: string,
 	filename?: string,
-	onProgress?: DownloadProgressCallback
+	onProgress?: DownloadProgressCallback,
+	node?: string
 ): Promise<string> {
 	if (MOCK_MODE) {
 		// Simulate download progress
@@ -358,13 +479,13 @@ export async function downloadIso(
 	}
 
 	try {
-		const node = await getNodeName();
+		const targetNode = node || await getPreferredNode();
 		const fname = filename || url.split('/').pop() || 'download.iso';
 
 		// Use execa with streaming to capture progress
 		const subprocess = execa('pvesh', [
 			'create',
-			`/nodes/${node}/storage/${storage}/download-url`,
+			`/nodes/${targetNode}/storage/${storage}/download-url`,
 			'--url', url,
 			'--content', 'iso',
 			'--filename', fname,
@@ -407,7 +528,7 @@ export async function downloadIso(
 /**
  * Upload a local ISO file to storage
  */
-export async function uploadIso(filePath: string, storage: string): Promise<string> {
+export async function uploadIso(filePath: string, storage: string, node?: string): Promise<string> {
 	if (MOCK_MODE) {
 		await new Promise((resolve) => setTimeout(resolve, 1000));
 		const filename = filePath.split('/').pop() || 'upload.iso';
@@ -415,13 +536,13 @@ export async function uploadIso(filePath: string, storage: string): Promise<stri
 	}
 
 	try {
-		const node = await getNodeName();
+		const targetNode = node || await getPreferredNode();
 		const filename = filePath.split('/').pop() || 'upload.iso';
 
 		// Use the Proxmox upload endpoint
 		await execa('pvesh', [
 			'create',
-			`/nodes/${node}/storage/${storage}/upload`,
+			`/nodes/${targetNode}/storage/${storage}/upload`,
 			'--content', 'iso',
 			'--filename', filePath,
 		]);
@@ -537,9 +658,13 @@ export async function stopVm(vmid: number, force: boolean = false): Promise<void
  */
 export async function getVmStatus(vmid: number): Promise<{ status: string; type: 'qemu' | 'lxc' } | null> {
 	if (MOCK_MODE) {
-		if (vmid === 103) return { status: 'stopped', type: 'qemu' };
-		if (vmid === 102) return { status: 'running', type: 'lxc' };
-		return { status: 'running', type: 'qemu' };
+		const mockVms = [
+			{ vmid: 100, status: 'running', type: 'qemu' as const },
+			{ vmid: 101, status: 'running', type: 'qemu' as const },
+			{ vmid: 102, status: 'running', type: 'lxc' as const },
+			{ vmid: 103, status: 'stopped', type: 'qemu' as const },
+		];
+		return mockVms.find(vm => vm.vmid === vmid) || null;
 	}
 
 	const info = await getVmInfo(vmid);
