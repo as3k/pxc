@@ -50,7 +50,7 @@ export function StartCommand({ vmid }: StartCommandProps) {
 
 			{status === 'checking' && <Loading>Checking {vmid}...</Loading>}
 
-			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found</ErrorMessage>}
+			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found in cluster</ErrorMessage>}
 
 			{status === 'starting' && <Loading>Starting {typeLabel} {vmid}...</Loading>}
 

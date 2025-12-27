@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Box } from 'ink';
 import { Welcome } from '../steps/Welcome.js';
 import { Identity } from '../steps/Identity.js';
+import { NodeSelection } from '../steps/NodeSelection.js';
 import { Compute } from '../steps/Compute.js';
 import { Storage } from '../steps/Storage.js';
 import { Network } from '../steps/Network.js';
@@ -27,7 +28,8 @@ export function CreateCommand({ packageName }: CreateCommandProps) {
 
 		// Progress through the steps
 		if (step === 'welcome') setStep('identity');
-		else if (step === 'identity') setStep('compute');
+		else if (step === 'identity') setStep('node-selection');
+		else if (step === 'node-selection') setStep('compute');
 		else if (step === 'compute') setStep('storage');
 		else if (step === 'storage') setStep('network');
 		else if (step === 'network') setStep('iso');
@@ -48,6 +50,7 @@ export function CreateCommand({ packageName }: CreateCommandProps) {
 		<Box>
 			{step === 'welcome' && <Welcome onNext={() => handleNext({})} onError={handleError} />}
 			{step === 'identity' && <Identity state={state} onNext={handleNext} />}
+			{step === 'node-selection' && <NodeSelection state={state} onNext={handleNext} packageName={packageName} />}
 			{step === 'compute' && <Compute state={state} onNext={handleNext} packageName={packageName} />}
 			{step === 'storage' && <Storage state={state} onNext={handleNext} packageName={packageName} />}
 			{step === 'network' && <Network state={state} onNext={handleNext} packageName={packageName} />}

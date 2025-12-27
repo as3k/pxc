@@ -51,7 +51,7 @@ export function StopCommand({ vmid, force }: StopCommandProps) {
 
 			{status === 'checking' && <Loading>Checking {vmid}...</Loading>}
 
-			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found</ErrorMessage>}
+			{status === 'not-found' && <ErrorMessage>{typeLabel} {vmid} not found in cluster</ErrorMessage>}
 
 			{status === 'stopping' && (
 				<Loading>{force ? 'Force stopping' : 'Stopping'} {typeLabel} {vmid}...</Loading>

@@ -21,6 +21,12 @@ export function Success({ state }: SuccessProps) {
 					<Text dimColor>Name:  </Text>
 					{state.name}
 				</Text>
+				{state.node && (
+					<Text>
+						<Text dimColor>Node:  </Text>
+						{state.node}
+					</Text>
+				)}
 			</Box>
 			<Text dimColor>Next steps:</Text>
 			<Box paddingLeft={2} flexDirection="column">

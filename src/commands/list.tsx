@@ -1,24 +1,36 @@
 import React, { useState, useEffect } from 'react';
 import { Text, Box } from 'ink';
-import { listVms } from '../lib/proxmox.js';
+import { listVms, getClusterNodes, isClusterEnvironment } from '../lib/proxmox.js';
 import { Loading, formatBytes, formatUptime } from '../lib/ui.js';
-import type { VmInfo } from '../lib/types.js';
+import type { VmInfo, ClusterNode } from '../lib/types.js';
 
 export function ListCommand() {
 	const [vms, setVms] = useState<VmInfo[]>([]);
+	const [nodes, setNodes] = useState<ClusterNode[]>([]);
+	const [isCluster, setIsCluster] = useState(false);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string>('');
 
 	useEffect(() => {
-		listVms()
-			.then((data) => {
-				setVms(data.sort((a, b) => a.vmid - b.vmid));
+		async function loadData() {
+			try {
+				const [vmData, clusterData, clusterStatus] = await Promise.all([
+					listVms(),
+					getClusterNodes().catch(() => []), // Don't fail if no cluster
+					isClusterEnvironment().catch(() => false)
+				]);
+				
+				setVms(vmData.sort((a, b) => a.vmid - b.vmid));
+				setNodes(clusterData);
+				setIsCluster(clusterStatus);
 				setLoading(false);
-			})
-			.catch((err) => {
+			} catch (err: any) {
 				setError(err.message);
 				setLoading(false);
-			});
+			}
+		}
+		
+		loadData();
 	}, []);
 
 	if (loading) {
@@ -59,13 +71,60 @@ export function ListCommand() {
 	const ctCount = vms.filter((v) => v.type === 'lxc').length;
 	const runningCount = vms.filter((v) => v.status === 'running').length;
 
+	// Group VMs by node for cluster view
+	const vmsByNode = isCluster ? vms.reduce((acc, vm) => {
+		if (!acc[vm.node]) acc[vm.node] = [];
+		acc[vm.node].push(vm);
+		return acc;
+	}, {} as Record<string, VmInfo[]>) : {};
+
+	// Get node status
+	const getNodeStatus = (nodeName: string) => {
+		const node = nodes.find(n => n.name === nodeName);
+		return node ? node.status : 'unknown';
+	};
+
+	const renderVmRow = (vm: VmInfo) => (
+		<Box key={vm.vmid}>
+			<Text dimColor>{String(vm.vmid).padEnd(idWidth)}</Text>
+			<Text color={vm.type === 'qemu' ? 'blue' : 'magenta'}>
+				{(vm.type === 'qemu' ? 'VM' : 'CT').padEnd(typeWidth)}
+			</Text>
+			<Text bold>{vm.name.padEnd(nameWidth)}</Text>
+			<Text dimColor>{vm.node.padEnd(nodeWidth)}</Text>
+			<Text color={vm.status === 'running' ? 'green' : vm.status === 'stopped' ? 'gray' : 'yellow'}>
+				{vm.status.padEnd(statusWidth)}
+			</Text>
+			<Text>{String(vm.cpus).padEnd(cpuWidth)}</Text>
+			<Text dimColor>
+				{`${formatBytes(vm.mem)} / ${formatBytes(vm.maxmem)}`.padEnd(memWidth)}
+			</Text>
+			<Text dimColor>{formatUptime(vm.uptime)}</Text>
+		</Box>
+	);
+
 	return (
 		<Box flexDirection="column" paddingY={1}>
 			{/* Header */}
 			<Box marginBottom={1}>
 				<Text bold color="magenta">▲ pxc </Text>
 				<Text bold>list</Text>
+				{isCluster && <Text dimColor> (cluster mode)</Text>}
 			</Box>
+
+			{/* Cluster Summary */}
+			{isCluster && nodes.length > 0 && (
+				<Box marginBottom={1}>
+					<Text dimColor>
+						Cluster: {nodes.filter(n => n.status === 'online').length}/{nodes.length} nodes online
+						{nodes.map(n => (
+							<Text key={n.name} color={n.status === 'online' ? 'green' : 'red'}>
+								{' • '}{n.name}({n.status === 'online' ? '●' : '○'})
+							</Text>
+						))}
+					</Text>
+				</Box>
+			)}
 
 			{/* Table Header */}
 			<Text bold dimColor>
@@ -79,25 +138,21 @@ export function ListCommand() {
 				{'UPTIME'}
 			</Text>
 
-			{/* VMs and Containers */}
-			{vms.map((vm) => (
-				<Box key={vm.vmid}>
-					<Text dimColor>{String(vm.vmid).padEnd(idWidth)}</Text>
-					<Text color={vm.type === 'qemu' ? 'blue' : 'magenta'}>
-						{(vm.type === 'qemu' ? 'VM' : 'CT').padEnd(typeWidth)}
-					</Text>
-					<Text bold>{vm.name.padEnd(nameWidth)}</Text>
-					<Text dimColor>{vm.node.padEnd(nodeWidth)}</Text>
-					<Text color={vm.status === 'running' ? 'green' : vm.status === 'stopped' ? 'gray' : 'yellow'}>
-						{vm.status.padEnd(statusWidth)}
-					</Text>
-					<Text>{String(vm.cpus).padEnd(cpuWidth)}</Text>
-					<Text dimColor>
-						{`${formatBytes(vm.mem)} / ${formatBytes(vm.maxmem)}`.padEnd(memWidth)}
-					</Text>
-					<Text dimColor>{formatUptime(vm.uptime)}</Text>
-				</Box>
-			))}
+			{/* VMs and Containers - Group by node in cluster mode */}
+			{isCluster && Object.keys(vmsByNode).length > 0 ? (
+				Object.entries(vmsByNode).map(([nodeName, nodeVms]) => (
+					<Box key={nodeName} flexDirection="column" marginBottom={1}>
+						{Object.keys(vmsByNode).length > 1 && (
+							<Text bold color={getNodeStatus(nodeName) === 'online' ? 'green' : 'red'}>
+								{nodeName} ({nodeVms.length} VMs) {getNodeStatus(nodeName) === 'online' ? '●' : '○'}
+							</Text>
+						)}
+						{nodeVms.map(renderVmRow)}
+					</Box>
+				))
+			) : (
+				vms.map(renderVmRow)
+			)}
 
 			{/* Summary */}
 			<Box marginTop={1}>
@@ -106,6 +161,9 @@ export function ListCommand() {
 					<Text color="blue"> • {vmCount} VMs</Text>
 					<Text color="magenta"> • {ctCount} CTs</Text>
 					<Text color="green"> • {runningCount} running</Text>
+					{isCluster && (
+						<Text> • {nodes.filter(n => n.status === 'online').length}/{nodes.length} nodes online</Text>
+					)}
 				</Text>
 			</Box>
 		</Box>
