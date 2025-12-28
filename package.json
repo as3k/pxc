@@ -1,6 +1,6 @@
 {
   "name": "pxc",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "description": "Modern CLI for creating Proxmox VMs with a Vercel-like experience",
   "type": "module",
   "bin": {
