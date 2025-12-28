@@ -672,3 +672,240 @@ export async function getVmStatus(vmid: number): Promise<{ status: string; type:
 
 	return { status: info.status, type: info.type };
 }
+
+/**
+ * Get detailed VM information for dry-run operations
+ */
+export async function getVmDetails(vmid: number): Promise<{
+	name: string;
+	type: 'qemu' | 'lxc';
+	node: string;
+	status: string;
+	disks: Array<{ storage: string; size: string; type: string }>;
+	cpuCount: number;
+	memoryMb: number;
+} | null> {
+	if (MOCK_MODE || process.env.MOCK_PROXMOX === '1') {
+		const mockVms: { [key: number]: any } = {
+			100: {
+				name: 'web-server',
+				type: 'qemu',
+				node: 'node1',
+				status: 'running',
+				disks: [
+					{ storage: 'local-lvm', size: '32G', type: 'scsi0' }
+				],
+				cpuCount: 2,
+				memoryMb: 2048
+			},
+			102: {
+				name: 'container-1',
+				type: 'lxc',
+				node: 'node1',
+				status: 'running',
+				disks: [
+					{ storage: 'local-lvm', size: '8G', type: 'rootfs' }
+				],
+				cpuCount: 2,
+				memoryMb: 1024
+			}
+		};
+		return mockVms[vmid] || null;
+	}
+
+	const info = await getVmInfo(vmid);
+	if (!info) return null;
+
+	try {
+		const cmd = info.type === 'lxc' ? 'pct' : 'qm';
+		const { stdout } = await execa(cmd, ['config', vmid.toString()]);
+		
+		// Parse VM configuration to extract disk information
+		const lines = stdout.split('\n');
+		const disks: Array<{ storage: string; size: string; type: string }> = [];
+		
+		for (const line of lines) {
+			const trimmedLine = line.trim();
+			// Parse disk entries like: scsi0: local-lvm:vm-100-disk-0,size=32G
+			if (trimmedLine.match(/^(scsi|virtio|sata|ide)\d+:/) || trimmedLine.startsWith('rootfs:')) {
+				const parts = trimmedLine.split(':');
+				const diskType = parts[0];
+				const diskConfig = parts[1] || '';
+				
+				// Extract storage and size
+				const storageMatch = diskConfig.match(/^([^,]+)/);
+				const sizeMatch = diskConfig.match(/size=([^,]+)/);
+				
+				if (storageMatch) {
+					disks.push({
+						storage: storageMatch[1],
+						size: sizeMatch ? sizeMatch[1] : 'unknown',
+						type: diskType
+					});
+				}
+			}
+		}
+
+		// Extract CPU and memory info
+		const memoryLine = lines.find(line => line.trim().startsWith('memory:'));
+		const coresLine = lines.find(line => line.trim().startsWith('cores:'));
+		
+		const memoryMb = memoryLine ? parseInt(memoryLine.split(':')[1].trim(), 10) : info.maxmem / (1024 * 1024);
+		const cpuCount = coresLine ? parseInt(coresLine.split(':')[1].trim(), 10) : info.cpus;
+
+		return {
+			name: info.name,
+			type: info.type,
+			node: info.node,
+			status: info.status,
+			disks,
+			cpuCount,
+			memoryMb
+		};
+	} catch (error: any) {
+		// If we can't get detailed config, return basic info
+		return {
+			name: info.name,
+			type: info.type,
+			node: info.node,
+			status: info.status,
+			disks: [],
+			cpuCount: info.cpus,
+			memoryMb: info.maxmem / (1024 * 1024)
+		};
+	}
+}
+
+/**
+ * Delete a VM (qemu)
+ */
+export async function deleteVm(vmid: number, purgeDisks: boolean = false): Promise<void> {
+	if (MOCK_MODE || process.env.MOCK_PROXMOX === '1') {
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+		console.log(`[MOCK] Would delete VM ${vmid}${purgeDisks ? ' and purge disks' : ''}`);
+		return;
+	}
+
+	// Verify VM exists and is a qemu VM
+	const info = await getVmInfo(vmid);
+	if (!info) {
+		throw new Error(`VM ${vmid} not found`);
+	}
+	if (info.type !== 'qemu') {
+		throw new Error(`VM ${vmid} is a container, not a VM. Use deleteContainer instead.`);
+	}
+
+	try {
+		const args = ['destroy', vmid.toString()];
+		if (purgeDisks) {
+			args.push('--purge');
+		}
+		await execa('qm', args);
+	} catch (error: any) {
+		throw new Error(`Failed to delete VM ${vmid}: ${error.message}`);
+	}
+}
+
+/**
+ * Delete a container (lxc)
+ */
+export async function deleteContainer(vmid: number, purgeDisks: boolean = false): Promise<void> {
+	if (MOCK_MODE || process.env.MOCK_PROXMOX === '1') {
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+		console.log(`[MOCK] Would delete container ${vmid}${purgeDisks ? ' and purge disks' : ''}`);
+		return;
+	}
+
+	// Verify container exists and is an lxc container
+	const info = await getVmInfo(vmid);
+	if (!info) {
+		throw new Error(`Container ${vmid} not found`);
+	}
+	if (info.type !== 'lxc') {
+		throw new Error(`Container ${vmid} is a VM, not a container. Use deleteVm instead.`);
+	}
+
+	try {
+		const args = ['destroy', vmid.toString()];
+		if (purgeDisks) {
+			args.push('--purge');
+		}
+		await execa('pct', args);
+	} catch (error: any) {
+		throw new Error(`Failed to delete container ${vmid}: ${error.message}`);
+	}
+}
+
+/**
+ * Get container information (alias for getVmInfo for consistency)
+ */
+export async function getContainerInfo(vmid: number): Promise<VmInfo | null> {
+	const info = await getVmInfo(vmid);
+	if (info && info.type !== 'lxc') {
+		throw new Error(`VM ${vmid} is not a container`);
+	}
+	return info;
+}
+
+/**
+ * Get disk usage information for a VM or container
+ */
+export async function getDiskUsage(vmid: number): Promise<Array<{
+	storage: string;
+	size: string;
+	type: string;
+	used?: string;
+	available?: string;
+}> | null> {
+	const details = await getVmDetails(vmid);
+	if (!details) return null;
+
+	// For mock mode, return enhanced disk information
+	if (MOCK_MODE || process.env.MOCK_PROXMOX === '1') {
+		return details.disks.map(disk => ({
+			...disk,
+			used: Math.floor(Math.random() * parseInt(disk.size) * 0.7) + 'G',
+			available: Math.floor(parseInt(disk.size) * 0.3) + 'G'
+		}));
+	}
+
+	try {
+		const enhancedDisks = [];
+		
+		for (const disk of details.disks) {
+			try {
+				// Get storage information to include usage stats
+				const { stdout } = await execa('pvesm', ['status', disk.storage]);
+				const lines = stdout.split('\n');
+				const headerLine = lines.find(line => line.includes('Total'));
+				
+				let used = undefined;
+				let available = undefined;
+				
+				if (headerLine) {
+					const parts = headerLine.split(/\s+/);
+					// Parse storage usage from pvesm status output
+					const totalIndex = parts.findIndex(p => p.includes('Total'));
+					if (totalIndex > 0) {
+						used = parts[totalIndex - 2] || undefined;
+						available = parts[totalIndex - 1] || undefined;
+					}
+				}
+				
+				enhancedDisks.push({
+					...disk,
+					used,
+					available
+				});
+			} catch {
+				// If we can't get storage stats, just return basic disk info
+				enhancedDisks.push(disk);
+			}
+		}
+		
+		return enhancedDisks;
+	} catch (error: any) {
+		// If we can't get enhanced info, return basic disk info
+		return details.disks;
+	}
+}

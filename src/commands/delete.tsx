@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Text, Box, useInput } from 'ink';
 import { getVmInfo, stopVm, deleteVm, deleteContainer, getVmDetails, getDiskUsage } from '../lib/proxmox.js';
 import { Loading, Success, ErrorMessage, Warning, Info, LabelValue, Divider, formatBytes, formatUptime, TypeBadge, StatusBadge } from '../lib/ui.js';
+import { getDeleteGracePeriod } from '../lib/config.js';
 
 interface DeleteCommandProps {
 	vmid: number;
@@ -33,7 +34,8 @@ export function DeleteCommand({ vmid, dryRun = false }: DeleteCommandProps) {
 	const [error, setError] = useState<string>('');
 	const [vmInfo, setVmInfo] = useState<VmDetails | null>(null);
 	const [verificationInput, setVerificationInput] = useState<string>('');
-	const [graceCountdown, setGraceCountdown] = useState<number>(10);
+	const graceConfig = getDeleteGracePeriod();
+	const [graceCountdown, setGraceCountdown] = useState<number>(graceConfig.seconds);
 	const [shouldStopFirst, setShouldStopFirst] = useState<boolean>(false);
 
 	useEffect(() => {
@@ -98,7 +100,11 @@ export function DeleteCommand({ vmid, dryRun = false }: DeleteCommandProps) {
 				const expectedValue = `${vmid} DELETE`;
 				if (verificationInput.trim().toUpperCase() === expectedValue) {
 					if (!dryRun) {
-						setStatus('grace-period');
+						if (graceConfig.disabled) {
+							setStatus('deleting');
+						} else {
+							setStatus('grace-period');
+						}
 					} else {
 						setStatus('success');
 					}
@@ -375,6 +381,10 @@ export function DeleteCommand({ vmid, dryRun = false }: DeleteCommandProps) {
 	}
 
 	if (status === 'success') {
+		useEffect(() => {
+			setTimeout(() => process.exit(0), 100);
+		}, []);
+		
 		return (
 			<Box flexDirection="column" paddingY={1}>
 				<Box marginBottom={1}>

@@ -6,6 +6,7 @@ import { CreateCommand } from './commands/create.js';
 import { ListCommand } from './commands/list.js';
 import { StartCommand } from './commands/start.js';
 import { StopCommand } from './commands/stop.js';
+import { DeleteCommand } from './commands/delete.js';
 import { IsoListCommand } from './commands/iso-list.js';
 import { IsoDownloadCommand } from './commands/iso-download.js';
 import { IsoUploadCommand } from './commands/iso-upload.js';
@@ -64,6 +65,20 @@ program
 			process.exit(1);
 		}
 		render(<StopCommand vmid={id} force={options.force ?? false} />);
+	});
+
+program
+	.command('delete <vmid>')
+	.alias('rm')
+	.description('Delete a VM or container')
+	.option('--dry-run', 'Show what would be deleted without actually deleting')
+	.action((vmid: string, options: { dryRun?: boolean }) => {
+		const id = parseInt(vmid, 10);
+		if (isNaN(id)) {
+			console.error('Error: VMID must be a number');
+			process.exit(1);
+		}
+		render(<DeleteCommand vmid={id} dryRun={options.dryRun ?? false} />);
 	});
 
 // ISO subcommands

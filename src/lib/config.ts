@@ -48,6 +48,10 @@ export interface Config {
 	}>;
 	ui?: {
 		savePreferences?: boolean;
+		delete?: {
+			gracePeriodSeconds?: number;
+			disableGracePeriod?: boolean;
+		};
 	};
 }
 
@@ -328,4 +332,20 @@ export function getNodeResolvedDefaults(node: string, packageName?: string): Par
 	}
 
 	return resolved;
+}
+
+/**
+ * Get delete timeout configuration
+ */
+export function getDeleteGracePeriod(): { seconds: number; disabled: boolean } {
+	const config = loadConfig();
+	
+	// If grace period is explicitly disabled, return disabled state
+	if (config.ui?.delete?.disableGracePeriod) {
+		return { seconds: 0, disabled: true };
+	}
+	
+	// Return configured seconds or default to 5
+	const seconds = config.ui?.delete?.gracePeriodSeconds ?? 5;
+	return { seconds, disabled: false };
 }
